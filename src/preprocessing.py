@@ -186,4 +186,62 @@ def load_and_clean_2014_res():
  df = pd.read_csv(RAW_DATA_FILES['2014_res'], sep=';', encoding='iso-8859-1', low_memory=False)
  return df
 
+def _load_and_clean_2026_res(tour):
+    filepath = RAW_DATA_FILES['2026_res_tour' + str(tour)]
+    COLS_FIXES = [
+        'Code département', 'Libellé département',
+        'Code commune', 'Libellé commune', 'Code BV',
+        'Inscrits', 'Votants', '% Votants',
+        'Abstentions', '% Abstentions',
+        'Exprimés', '% Exprimés/inscrits', '% Exprimés/votants',
+        'Blancs', '% Blancs/inscrits', '% Blancs/votants',
+        'Nuls', '% Nuls/inscrits', '% Nuls/votants',
+    ]
+    COLS_LISTE = [
+        'N° panneau', 'Nom', 'Prénom', 'Sexe',
+        'Code Nuance', 'Libellé abrégé liste', 'Libellé liste',
+        'Voix', '% Voix/inscrits', '% Voix/exprimés',
+        'Elu', 'Sièges CM', 'Sièges CC',
+    ]
+    N_FIXES = len(COLS_FIXES)
+    N_LISTE = len(COLS_LISTE)
+
+    df_raw = pd.read_csv(filepath, sep=';', encoding='utf-8', header=0, dtype=str)
+
+    blocs = []
+    for _, row in df_raw.iterrows():
+        vals = list(row)
+        if len(vals) < N_FIXES:
+            continue
+
+        fixes = vals[:N_FIXES]
+        reste = vals[N_FIXES:]
+        n_listes = len(reste) // N_LISTE
+
+        for i in range(n_listes):
+            bloc_liste = reste[i * N_LISTE:(i + 1) * N_LISTE]
+            if len(bloc_liste) < N_LISTE:
+                continue
+            # Ignorer les blocs vides (pas de numéro de panneau)
+            if pd.isna(bloc_liste[0]) or str(bloc_liste[0]).strip() == '':
+                continue
+            blocs.append(fixes + bloc_liste + [tour])
+
+    df = pd.DataFrame(blocs, columns=COLS_FIXES + COLS_LISTE + ['Tour'])
+
+    cols_numeriques = ['Inscrits', 'Votants', 'Abstentions', 'Exprimés', 'Blancs', 'Nuls', 'Voix']
+    for col in cols_numeriques:
+        df[col] = pd.to_numeric(df[col], errors='coerce')
+
+    cols_pct = [
+        '% Votants', '% Abstentions', '% Exprimés/inscrits', '% Exprimés/votants',
+        '% Blancs/inscrits', '% Blancs/votants', '% Nuls/inscrits', '% Nuls/votants',
+        '% Voix/inscrits', '% Voix/exprimés',
+    ]
+    for col in cols_pct:
+        df[col] = pd.to_numeric(df[col].str.replace(',', '.').str.replace('%', '').str.strip(), errors='coerce')
+
+    df = df.dropna(subset=['Voix'])
+
+    return df
 
