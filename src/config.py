@@ -34,6 +34,8 @@ RAW_DATA_FILES = {
     "2014_res": RAW_DATA_DIR / "Resultat/2014_BVot_T1T2.txt",
     "2020_res_tour1": RAW_DATA_DIR / "Resultat/2020-05-18-resultats-par-niveau-burvot-t1-france-entiere.xlsx",
     "2020_res_tour2": RAW_DATA_DIR / "Resultat/resultats-par-niveau-burvot-t2-france-entiere.xlsx",
+    "2026_res_tour1": RAW_DATA_DIR / "Resultat/2026_Tour1.csv",
+    "2026_res_tour2": RAW_DATA_DIR / "Resultat/2026_Tour2.csv"
 }
 
 PROCESSED_DATA_FILES = {

@@ -23,8 +23,6 @@ def load_and_clean_ville_stats_histo():
  df2 = pd.read_csv(RAW_DATA_FILES['stat_ville_histo_metadata'], sep=';')
  return df1, df2
 
-# ... existing code ...
-
 def load_and_clean_2020_res_tour1():
     return _load_and_clean_2020_res(RAW_DATA_FILES['2020_res_tour1'])
 
@@ -134,17 +132,27 @@ def load_and_clean_2008_res():
     N_LISTE = len(COLS_LISTE)
 
     blocs = []
+    tour_courant = None
+
     with open(RAW_DATA_FILES['2008_res'], encoding='iso-8859-1') as f:
         lignes = [l.rstrip('\n').rstrip(';') for l in f if l.strip()]
 
-    # La première ligne non-vide est l'en-tête, on la saute
-    for line in lignes[1:]:
+    for line in lignes:
+        # Détection des marqueurs de tour
+        stripped = line.strip()
+        if stripped == 'Tour1':
+            tour_courant = 1
+            continue
+        elif stripped == 'Tour2':
+            tour_courant = 2
+            continue
+
         champs = line.split(';')
         if len(champs) < N_FIXES:
             continue
 
         fixes = champs[:N_FIXES]
-        # Vérification : le 1er champ fixes doit ressembler à une date, pas à un nom de colonne
+        # Ignorer la ligne d'en-tête
         if fixes[0].startswith('Date'):
             continue
 
@@ -155,9 +163,9 @@ def load_and_clean_2008_res():
             bloc_liste = reste[i * N_LISTE:(i + 1) * N_LISTE]
             if len(bloc_liste) < N_LISTE:
                 continue
-            blocs.append(fixes + bloc_liste)
+            blocs.append(fixes + bloc_liste + [tour_courant])
 
-    df = pd.DataFrame(blocs, columns=COLS_FIXES + COLS_LISTE)
+    df = pd.DataFrame(blocs, columns=COLS_FIXES + COLS_LISTE + ['Tour'])
 
     # Nettoyage des types numériques entiers
     cols_numeriques = ['Inscrits', 'Abstentions', 'Votants', 'Blancs et nuls', 'Exprimés', 'Sièges', 'Voix']
@@ -173,7 +181,6 @@ def load_and_clean_2008_res():
     df = df.dropna(subset=['Voix'])
 
     return df
-
 
 def load_and_clean_2014_res():
  df = pd.read_csv(RAW_DATA_FILES['2014_res'], sep=';', encoding='iso-8859-1', low_memory=False)

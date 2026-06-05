@@ -20,3 +20,5 @@ https://www.data.gouv.fr/datasets/repertoire-national-des-elus-1 - Répertoire n
 https://catalogue-donnees.insee.fr/fr/explorateur/DS_POPULATIONS_HISTORIQUES - Données démographiques historiques (1968 à 2023)
 https://www.data.gouv.fr/datasets/donnees-des-elections-agregees - Nuances Politiques   
 https://object.files.data.gouv.fr/data-pipeline-open/elections/general_results.csv - Stat sur les votes (Peut être utile ou non)
+https://www.data.gouv.fr/datasets/elections-municipales-2026-resultats-du-premier-tour?resource_id=1428132c-ad5e-437e-a928-7c2a254e40eb - Résultats des élections municipales de 2026 1er tour
+https://www.data.gouv.fr/datasets/elections-municipales-2026-resultats-du-second-tour - Résultats des élections municipales de 2026 2nd tour
