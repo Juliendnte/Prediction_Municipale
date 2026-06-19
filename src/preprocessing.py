@@ -1,5 +1,9 @@
 import pandas as pd
 from .config import RAW_DATA_FILES, URLS
+import re
+
+def _read_insee_excel_sheet(filepath, sheet_name):
+    return pd.read_excel(filepath, sheet_name=sheet_name, dtype=str)
 
 
 def load_and_clean_candidats():
@@ -244,4 +248,45 @@ def _load_and_clean_2026_res(tour):
     df = df.dropna(subset=['Voix'])
 
     return df
+
+def _extract_insee_variable_metadata(filepath):
+    """
+    Lit la feuille 'Liste des variables' d'un fichier INSEE et extrait les libellés
+    des modalités, par exemple :
+    SEXE -> 1 Hommes, 2 Femmes
+    AGEQ65 -> 015 15 à 19 ans
+    DIPL_15 -> A Aucun diplôme...
+    """
+    df_meta = pd.read_excel(filepath, sheet_name="Liste des variables", header=None, dtype=str)
+    lines = (
+        df_meta.fillna("")
+        .astype(str)
+        .agg(" ".join, axis=1)
+        .str.strip()
+        .tolist()
+    )
+
+    metadata = {}
+    current_variable = None
+
+    variable_pattern = re.compile(r"^([A-Z0-9_]+)\s*:\s*(.+)$")
+    modality_pattern = re.compile(r"^([A-Z0-9]+)\s*:\s*(.+)$")
+
+    for line in lines:
+        if not line:
+            continue
+
+        variable_match = variable_pattern.match(line)
+        if variable_match:
+            current_variable = variable_match.group(1)
+            metadata[current_variable] = {}
+            continue
+
+        modality_match = modality_pattern.match(line)
+        if current_variable and modality_match:
+            code = modality_match.group(1)
+            label = modality_match.group(2)
+            metadata[current_variable][code] = label
+
+    return metadata
 
