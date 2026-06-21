@@ -16,9 +16,6 @@ https://www.data.gouv.fr/datasets/elections-municipales-2008-communes-de-plus-de
 https://www.data.gouv.fr/datasets/elections-municipales-2014-resultats-par-bureaux-de-vote - Résultats des élections municipales de 2014
 https://www.data.gouv.fr/datasets/elections-municipales-2020-resultats-1er-tour - Résultats des élections municipales du 1er tour de 2020
 https://www.data.gouv.fr/datasets/municipales-2020-resultats-2nd-tour - Résultats des élections municipales du 2nd tour de 2020
-https://www.data.gouv.fr/datasets/repertoire-national-des-elus-1 - Répertoire national des élus (Pas utile car que 2020)
-https://catalogue-donnees.insee.fr/fr/explorateur/DS_POPULATIONS_HISTORIQUES - Données démographiques historiques (1968 à 2023)
 https://www.data.gouv.fr/datasets/donnees-des-elections-agregees - Nuances Politiques   
-https://object.files.data.gouv.fr/data-pipeline-open/elections/general_results.csv - Stat sur les votes (Peut être utile ou non)
 https://www.data.gouv.fr/datasets/elections-municipales-2026-resultats-du-premier-tour?resource_id=1428132c-ad5e-437e-a928-7c2a254e40eb - Résultats des élections municipales de 2026 1er tour
 https://www.data.gouv.fr/datasets/elections-municipales-2026-resultats-du-second-tour - Résultats des élections municipales de 2026 2nd tour

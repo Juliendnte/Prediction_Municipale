@@ -1,31 +1,14 @@
 import pandas as pd
-from .config import RAW_DATA_FILES, URLS
+from .config import RAW_DATA_FILES, PROCESSED_DATA_FILES
 import re
 
 def _read_insee_excel_sheet(filepath, sheet_name):
     return pd.read_excel(filepath, sheet_name=sheet_name, dtype=str)
 
 
-def load_and_clean_candidats():
- df = pd.read_excel(RAW_DATA_FILES['livre-des-listes-et-candidats'], skiprows=2)
- return df
-
-def load_and_clean_candidats_stats():
- df = pd.read_csv(RAW_DATA_FILES['candidats_stat'], sep=';')
- return df
-
 def load_and_clean_nuances():
  df = pd.read_csv(RAW_DATA_FILES['nuances'])
  return df
-
-def load_and_clean_ville_stats():
- df = pd.read_csv(URLS['ville_stat'], sep=';', low_memory=False, on_bad_lines='skip')
- return df
-
-def load_and_clean_ville_stats_histo():
- df1 = pd.read_csv(RAW_DATA_FILES['stat_ville_histo'], sep=';')
- df2 = pd.read_csv(RAW_DATA_FILES['stat_ville_histo_metadata'], sep=';')
- return df1, df2
 
 def load_and_clean_2020_res_tour1():
     return _load_and_clean_2020_res(RAW_DATA_FILES['2020_res_tour1'])
@@ -167,6 +150,8 @@ def load_and_clean_2008_res():
             bloc_liste = reste[i * N_LISTE:(i + 1) * N_LISTE]
             if len(bloc_liste) < N_LISTE:
                 continue
+            if tour_courant is None:
+                continue  # ignorer les lignes avant le premier marqueur de tour
             blocs.append(fixes + bloc_liste + [tour_courant])
 
     df = pd.DataFrame(blocs, columns=COLS_FIXES + COLS_LISTE + ['Tour'])
@@ -290,6 +275,10 @@ def _extract_insee_variable_metadata(filepath):
 
     return metadata
 
+def load_and_clean_processed_res():
+    df = pd.read_csv(PROCESSED_DATA_FILES['res_all'], sep=';', encoding='utf-8', low_memory=False)
+    return df
+
 
 def _read_excel_data(path, sheet_name, header_row=None, nrows=None, skip_rows=None):
     df = pd.read_excel(
@@ -405,4 +394,3 @@ def load_and_clean_insee_2007_famille(sheet: str = "COM") -> pd.DataFrame:
             "NBENFFR": nbenffr_mapping
         }
     )
-    return df
