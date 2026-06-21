@@ -290,3 +290,119 @@ def _extract_insee_variable_metadata(filepath):
 
     return metadata
 
+
+def _read_excel_data(path, sheet_name, header_row=None, nrows=None, skip_rows=None):
+    df = pd.read_excel(
+        path,
+        sheet_name=sheet_name,
+        header=header_row,
+        nrows=nrows,
+        skiprows=skip_rows,
+    )
+    df.columns = df.columns.astype(str).str.strip()
+    return df
+
+def _build_mapping_from_single_column_df(df, separator=":"):
+    if df.shape[1] != 1:
+        raise ValueError("Le DataFrame doit contenir une seule colonne.")
+    mapping = {}
+    for value in df.iloc[:, 0].dropna():
+        value = str(value).strip()
+        if separator not in value:
+            continue
+        code, label = value.split(separator, 1)
+        key = code.strip()
+        mapping[key] = label.strip()
+    return mapping
+
+def _load_and_group_insee_data(file_path: str, sheet_name: str, variables_mapping: dict[str, dict[str, str]], separated_columns: list[str] = []) -> pd.DataFrame:
+    df = _read_excel_data(
+        file_path,
+        sheet_name=sheet_name,
+        header_row=8
+    )
+
+    # Round and convert to numeric, replacing non-numeric values with NaN
+    df = df.round(0).apply(pd.to_numeric, errors='coerce')
+    # Convert to int, ignoring errors for non-numeric columns  
+    for col in df.columns:
+        df[col] = df[col].astype('int', errors='ignore')  
+
+    columns = list(df.columns)
+    # Remove separated columns from the list of columns to process
+    for col in separated_columns:
+        if col in columns:
+            columns.remove(col)
+
+    flattened_data = []
+    variables = list(variables_mapping.keys())
+
+    for index, row in df.iterrows():
+        # Retrieve separated columns and add them to the row dictionary
+        separated_values = {}
+        for col in separated_columns:
+            separated_values[col] = row[col]
+        
+        for col in columns:
+            value = int(row[col])
+
+            col_simplified = col
+            for var in variables:
+                col_simplified = col_simplified.replace(var, '').strip()
+
+            split_parts = col_simplified.split('_')
+            if len(split_parts) != len(variables):
+                raise ValueError(f"Le nom de la colonne '{col}' ne correspond pas au format attendu.")
+    
+            row_to_add = {
+                **separated_values
+            }
+            
+            for i, var in enumerate(variables):
+                code = split_parts[i]
+                label = variables_mapping[var].get(code, None)
+                row_to_add[var] = label
+            
+            row_to_add["Nombre"] = value
+
+            flattened_data.append(row_to_add)
+
+    df_flattened = pd.DataFrame(flattened_data)
+
+    return df_flattened
+
+def load_and_clean_insee_2007_famille(sheet: str = "COM") -> pd.DataFrame:
+    """
+    Charge les données de la feuille "COM" du fichier BTX_TD_FAM4_2007.xls
+
+    Args:
+        sheet (str): Nom de la feuille à charger. Par défaut "COM".
+    """
+    file_path = RAW_DATA_FILES['INSEE_2007_Fam']
+
+    df_cs2_24 = _read_excel_data(
+        file_path,
+        sheet_name="liste_variables",
+        header_row=7,
+        nrows=24
+    )
+
+    df_nbenffr = _read_excel_data(
+        file_path,
+        sheet_name="liste_variables",
+        header_row=32,
+        nrows=5
+    )
+    cs2_24_mapping = _build_mapping_from_single_column_df(df_cs2_24)
+    nbenffr_mapping = _build_mapping_from_single_column_df(df_nbenffr)
+
+    df = _load_and_group_insee_data(
+        file_path=file_path,
+        sheet_name=sheet,
+        separated_columns=["CODGEO"],
+        variables_mapping={
+            "CS2_24": cs2_24_mapping,
+            "NBENFFR": nbenffr_mapping
+        }
+    )
+    return df
