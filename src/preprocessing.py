@@ -305,11 +305,15 @@ def _build_mapping_from_single_column_df(df, separator=":"):
     return mapping
 
 def _load_and_group_insee_data(file_path: str, sheet_name: str, variables_mapping: dict[str, dict[str, str]], separated_columns: list[str] = []) -> pd.DataFrame:
-    df = _read_excel_data(
-        file_path,
-        sheet_name=sheet_name,
-        header_row=8
-    )
+    for h in [8, 9, 10]:
+
+        df = _read_excel_data(
+            file_path,
+            sheet_name=sheet_name,
+            header_row=h,
+        )
+        if "CODGEO" in df.columns:
+            break
 
     # Round and convert to numeric, replacing non-numeric values with NaN
     df = df.round(0).apply(pd.to_numeric, errors='coerce')
@@ -394,3 +398,92 @@ def load_and_clean_insee_2007_famille(sheet: str = "COM") -> pd.DataFrame:
             "NBENFFR": nbenffr_mapping
         }
     )
+
+    return df
+
+
+def load_and_clean_insee_2007_menage(sheet: str = "COM") -> pd.DataFrame:
+    """
+    Charge les données de la feuille "COM" du fichier INSEE_2007_Men.xls
+
+    Args:
+        sheet (str): Nom de la feuille à charger. Par défaut "COM".
+    """
+    file_path = RAW_DATA_FILES['INSEE_2007_Men']
+
+    df_cs2_24 = _read_excel_data(
+        file_path,
+        sheet_name="liste_variables",
+        header_row=7,
+        nrows=24
+    )
+
+    df_nperc = _read_excel_data(
+        file_path,
+        sheet_name="liste_variables",
+        header_row=32,
+        nrows=6
+    )
+    cs2_24_mapping = _build_mapping_from_single_column_df(df_cs2_24)
+    nperc_mapping = _build_mapping_from_single_column_df(df_nperc)
+
+    df = _load_and_group_insee_data(
+        file_path=file_path,
+        sheet_name=sheet,
+        separated_columns=["CODGEO"],
+        variables_mapping={
+            "CS2_24": cs2_24_mapping,
+            "NPERC": nperc_mapping
+        }
+    )
+
+    return df
+
+def load_and_clean_insee_2007_diplome(sheet: str = "COM") -> pd.DataFrame:
+    """
+    Charge les données de la feuille "COM" du fichier INSEE_2007_Dip.xls
+
+    Args:
+        sheet (str): Nom de la feuille à charger. Par défaut "COM".
+    """
+    file_path = RAW_DATA_FILES['INSEE_2007_Dip']
+
+    df_sexe = _read_excel_data(
+        file_path,
+        sheet_name="Liste des variables",
+        header_row=7,
+        nrows=2
+    )
+
+    df_ageq65 = _read_excel_data(
+        file_path,
+        sheet_name="Liste des variables",
+        header_row=10,
+        nrows=11
+    )
+
+    df_dipl = _read_excel_data(
+        file_path,
+        sheet_name="Liste des variables",
+        header_row=22,
+        nrows=11
+    )
+
+    sexe_mapping = _build_mapping_from_single_column_df(df_sexe)
+    ageq65_mapping = _build_mapping_from_single_column_df(df_ageq65)
+    dipl_mapping = _build_mapping_from_single_column_df(df_dipl)
+
+    print("sexe", sexe_mapping, "ageq65", ageq65_mapping, "dipl", dipl_mapping)
+
+    df = _load_and_group_insee_data(
+        file_path=file_path,
+        sheet_name=sheet,
+        separated_columns=["CODGEO"],
+        variables_mapping={
+            "SEXE": sexe_mapping,
+            "AGEQ65": ageq65_mapping,
+            "DIPL": dipl_mapping
+        }
+    )
+
+    return df
