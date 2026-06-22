@@ -404,7 +404,7 @@ def load_and_clean_insee_2007_famille(sheet: str = "COM") -> pd.DataFrame:
 
 def load_and_clean_insee_2007_menage(sheet: str = "COM") -> pd.DataFrame:
     """
-    Charge les données de la feuille "COM" du fichier INSEE_2007_Men.xls
+    Charge les données de la feuille "COM" du fichier BTX_TD_MEN1_2007.xls
 
     Args:
         sheet (str): Nom de la feuille à charger. Par défaut "COM".
@@ -441,7 +441,7 @@ def load_and_clean_insee_2007_menage(sheet: str = "COM") -> pd.DataFrame:
 
 def load_and_clean_insee_2007_diplome(sheet: str = "COM") -> pd.DataFrame:
     """
-    Charge les données de la feuille "COM" du fichier INSEE_2007_Dip.xls
+    Charge les données de la feuille "COM" du fichier BTX_TD_FOR2_2007.xls
 
     Args:
         sheet (str): Nom de la feuille à charger. Par défaut "COM".
@@ -473,7 +473,7 @@ def load_and_clean_insee_2007_diplome(sheet: str = "COM") -> pd.DataFrame:
     ageq65_mapping = _build_mapping_from_single_column_df(df_ageq65)
     dipl_mapping = _build_mapping_from_single_column_df(df_dipl)
 
-    print("sexe", sexe_mapping, "ageq65", ageq65_mapping, "dipl", dipl_mapping)
+    #print("sexe", sexe_mapping, "ageq65", ageq65_mapping, "dipl", dipl_mapping)
 
     df = _load_and_group_insee_data(
         file_path=file_path,
@@ -487,3 +487,363 @@ def load_and_clean_insee_2007_diplome(sheet: str = "COM") -> pd.DataFrame:
     )
 
     return df
+
+def load_and_clean_insee_2007_population(sheet: str = "COM") -> pd.DataFrame:
+    """
+    Charge les données de la feuille "COM" du fichier BTX_TD_POP5_2007.xls
+
+    Args:
+        sheet (str): Nom de la feuille à charger. Par défaut "COM".
+    """
+    file_path = RAW_DATA_FILES['INSEE_2007_Pop']
+
+    df_sexe = _read_excel_data(
+        file_path,
+        sheet_name="liste_variables",
+        header_row=7,
+        nrows=2
+    )
+
+    df_ageq65 = _read_excel_data(
+        file_path,
+        sheet_name="liste_variables",
+        header_row=10,
+        nrows=11
+    )
+
+    df_tactr = _read_excel_data(
+        file_path,
+        sheet_name="liste_variables",
+        header_row=22,
+        nrows=11
+    )
+
+    sexe_mapping = _build_mapping_from_single_column_df(df_sexe)
+    ageq65_mapping = _build_mapping_from_single_column_df(df_ageq65)
+    tactr_mapping = _build_mapping_from_single_column_df(df_tactr)
+
+    #print("sexe", sexe_mapping, "ageq65", ageq65_mapping, "tactr", tactr_mapping)
+
+    df = _load_and_group_insee_data(
+        file_path=file_path,
+        sheet_name=sheet,
+        separated_columns=["CODGEO"],
+        variables_mapping={
+            "SEXE": sexe_mapping,
+            "AGEQ65": ageq65_mapping,
+            "TACTR": tactr_mapping
+        }
+    )
+
+    return df
+
+def load_and_clean_insee_2007_population2(sheet: str = "COM") -> pd.DataFrame:
+    """
+    Charge les données de la feuille "COM" du fichier BTX_TD_POP6_2007.xls
+
+    Args:
+        sheet (str): Nom de la feuille à charger. Par défaut "COM".
+    """
+    file_path = RAW_DATA_FILES['INSEE_2007_Pop']
+
+    df_sexe = _read_excel_data(
+        file_path,
+        sheet_name="liste_variables",
+        header_row=7,
+        nrows=2
+    )
+
+    df_ageq65 = _read_excel_data(
+        file_path,
+        sheet_name="liste_variables",
+        header_row=10,
+        nrows=11
+    )
+
+    df_cs1_8 = _read_excel_data(
+        file_path,
+        sheet_name="liste_variables",
+        header_row=22,
+        nrows=8
+    )
+
+    sexe_mapping = _build_mapping_from_single_column_df(df_sexe)
+    ageq65_mapping = _build_mapping_from_single_column_df(df_ageq65)
+    cs1_8_mapping = _build_mapping_from_single_column_df(df_cs1_8)
+
+    #print("sexe", sexe_mapping, "ageq65", ageq65_mapping, "tactr", tactr_mapping)
+
+    df = _load_and_group_insee_data(
+        file_path=file_path,
+        sheet_name=sheet,
+        separated_columns=["CODGEO"],
+        variables_mapping={
+            "SEXE": sexe_mapping,
+            "AGEQ65": ageq65_mapping,
+            "CS1_8": cs1_8_mapping
+        }
+    )
+
+    return df
+
+def load_and_clean_insee_2007_immigration(sheet: str = "COM") -> pd.DataFrame:
+    """
+    Charge les données de la feuille "COM" du fichier BTX_TD_IMG1_2007.xls
+
+    Args:
+        sheet (str): Nom de la feuille à charger. Par défaut "COM".
+    """
+    file_path = RAW_DATA_FILES['INSEE_2007_Img']
+
+    df_sexe = _read_excel_data(
+        file_path,
+        sheet_name="Liste_variables",
+        header_row=8,
+        nrows=2
+    )
+
+    df_age4 = _read_excel_data(
+        file_path,
+        sheet_name="Liste_variables",
+        header_row=11,
+        nrows=4
+    )
+
+    df_tactr = _read_excel_data(
+        file_path,
+        sheet_name="Liste_variables",
+        header_row=16,
+        nrows=6
+    )
+
+    df_immi = _read_excel_data(
+        file_path,
+        sheet_name="Liste_variables",
+        header_row=23,
+        nrows=2
+    )
+
+    sexe_mapping = _build_mapping_from_single_column_df(df_sexe)
+    age4_mapping = _build_mapping_from_single_column_df(df_age4)
+    tactr_mapping = _build_mapping_from_single_column_df(df_tactr)
+    immi_mapping = _build_mapping_from_single_column_df(df_immi)
+
+
+    #print("sexe", sexe_mapping, "ageq65", ageq65_mapping, "tactr", tactr_mapping)
+
+    df = _load_and_group_insee_data(
+        file_path=file_path,
+        sheet_name=sheet,
+        separated_columns=["CODGEO"],
+        variables_mapping={
+            "SEXE": sexe_mapping,
+            "AGE4": age4_mapping,
+            "TACTR": tactr_mapping,
+            "IMMI": immi_mapping
+        }
+    )
+
+    return df
+
+def load_and_clean_insee_2007_nationalite(sheet: str = "COM") -> pd.DataFrame:
+    """
+    Charge les données de la feuille "COM" du fichier BTX_TD_NAT1_2007.xls
+
+    Args:
+        sheet (str): Nom de la feuille à charger. Par défaut "COM".
+    """
+    file_path = RAW_DATA_FILES['INSEE_2007_Nat']
+
+    df_sexe = _read_excel_data(
+        file_path,
+        sheet_name="Liste des variables",
+        header_row=6,
+        nrows=2
+    )
+
+    df_inatc = _read_excel_data(
+        file_path,
+        sheet_name="Liste des variables",
+        header_row=9,
+        nrows=2
+    )
+
+    df_age4 = _read_excel_data(
+        file_path,
+        sheet_name="Liste des variables",
+        header_row=12,
+        nrows=4
+    )
+
+
+    sexe_mapping = _build_mapping_from_single_column_df(df_sexe)
+    inatc_mapping = _build_mapping_from_single_column_df(df_inatc)
+    age4_mapping = _build_mapping_from_single_column_df(df_age4)
+
+
+    #print("sexe", sexe_mapping, "ageq65", ageq65_mapping, "tactr", tactr_mapping)
+
+    df = _load_and_group_insee_data(
+        file_path=file_path,
+        sheet_name=sheet,
+        separated_columns=["CODGEO"],
+        variables_mapping={
+            "SEXE": sexe_mapping,
+            "INATC": inatc_mapping,
+            "AGE4": age4_mapping,
+        }
+    )
+
+    return df
+
+def load_and_clean_insee_2007_nationalite2(sheet: str = "COM") -> pd.DataFrame:
+    """
+    Charge les données de la feuille "COM" du fichier BTX_TD_NAT3_2007.xls
+
+    Args:
+        sheet (str): Nom de la feuille à charger. Par défaut "COM".
+    """
+    file_path = RAW_DATA_FILES['INSEE_2007_Nat2']
+
+    df_sexe = _read_excel_data(
+        file_path,
+        sheet_name="Liste des variables",
+        header_row=7,
+        nrows=2
+    )
+
+    df_inatc = _read_excel_data(
+        file_path,
+        sheet_name="Liste des variables",
+        header_row=10,
+        nrows=2
+    )
+
+    df_cs1_8 = _read_excel_data(
+        file_path,
+        sheet_name="Liste des variables",
+        header_row=13,
+        nrows=8
+    )
+
+
+    sexe_mapping = _build_mapping_from_single_column_df(df_sexe)
+    inatc_mapping = _build_mapping_from_single_column_df(df_inatc)
+    cs1_8_mapping = _build_mapping_from_single_column_df(df_cs1_8)
+
+
+    #print("sexe", sexe_mapping, "ageq65", ageq65_mapping, "tactr", tactr_mapping)
+
+    df = _load_and_group_insee_data(
+        file_path=file_path,
+        sheet_name=sheet,
+        separated_columns=["CODGEO"],
+        variables_mapping={
+            "SEXE": sexe_mapping,
+            "INATC": inatc_mapping,
+            "CS1_8": cs1_8_mapping,
+        }
+    )
+
+    return df
+
+def load_and_clean_insee_2007_logement(sheet: str = "COM") -> pd.DataFrame:
+    """
+    Charge les données de la feuille "COM" du fichier BTX_TD_PRINC14_2007.xls
+
+    Args:
+        sheet (str): Nom de la feuille à charger. Par défaut "COM".
+    """
+    file_path = RAW_DATA_FILES['INSEE_2007_Log']
+
+    df_typlr = _read_excel_data(
+        file_path,
+        sheet_name="Liste des variables",
+        header_row=6,
+        nrows=3
+    )
+
+    df_cs1_8 = _read_excel_data(
+        file_path,
+        sheet_name="Liste des variables",
+        header_row=10,
+        nrows=8
+    )
+
+    df_stocd = _read_excel_data(
+        file_path,
+        sheet_name="Liste des variables",
+        header_row=19,
+        nrows=5
+    )
+
+    typlr_mapping = _build_mapping_from_single_column_df(df_typlr)
+    cs1_8_mapping = _build_mapping_from_single_column_df(df_cs1_8)
+    stocd_mapping = _build_mapping_from_single_column_df(df_stocd)
+
+    #print("sexe", sexe_mapping, "ageq65", ageq65_mapping, "tactr", tactr_mapping)
+
+    df = _load_and_group_insee_data(
+        file_path=file_path,
+        sheet_name=sheet,
+        separated_columns=["CODGEO"],
+        variables_mapping={
+            "TYPLR": typlr_mapping,
+            "CS1_8": cs1_8_mapping,
+            "STOCD": stocd_mapping,
+        }
+    )
+
+    return df
+
+def load_and_clean_insee_2007_emploi(sheet: str = "COM") -> pd.DataFrame:
+    """
+    Charge les données de la feuille "COM" du fichier BTX_TD_EMP3_2007.xls
+
+    Args:
+        sheet (str): Nom de la feuille à charger. Par défaut "COM".
+    """
+    file_path = RAW_DATA_FILES['INSEE_2007_Emp']
+
+    df_sexe = _read_excel_data(
+        file_path,
+        sheet_name="liste_variables",
+        header_row=6,
+        nrows=2
+    )
+
+    df_cs3_31 = _read_excel_data(
+        file_path,
+        sheet_name="liste_variables",
+        header_row=10,
+        nrows=31
+    )
+
+    df_na5 = _read_excel_data(
+        file_path,
+        sheet_name="liste_variables",
+        header_row=42,
+        nrows=6
+    )
+
+    sexe_mapping = _build_mapping_from_single_column_df(df_sexe)
+    cs3_31_mapping = _build_mapping_from_single_column_df(df_cs3_31)
+    na5_mapping = _build_mapping_from_single_column_df(df_na5)
+
+    #print("sexe", sexe_mapping, "ageq65", ageq65_mapping, "tactr", tactr_mapping)
+
+    df = _load_and_group_insee_data(
+        file_path=file_path,
+        sheet_name=sheet,
+        separated_columns=["CODGEO"],
+        variables_mapping={
+            "SEXE": sexe_mapping,
+            "CS3_31": cs3_31_mapping,
+            "NA5": na5_mapping,
+        }
+    )
+
+    return df
+
+
+
