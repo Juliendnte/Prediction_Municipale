@@ -317,9 +317,9 @@ def _load_and_group_insee_data(file_path: str, sheet_name: str, variables_mappin
 
     # Round and convert to numeric, replacing non-numeric values with NaN
     df = df.round(0).apply(pd.to_numeric, errors='coerce')
-    # Convert to int, ignoring errors for non-numeric columns  
+    # Convert to int, ignoring errors for non-numeric columns
     for col in df.columns:
-        df[col] = df[col].astype('int', errors='ignore')  
+        df[col] = df[col].astype('int', errors='ignore')
 
     columns = list(df.columns)
     # Remove separated columns from the list of columns to process
@@ -335,7 +335,7 @@ def _load_and_group_insee_data(file_path: str, sheet_name: str, variables_mappin
         separated_values = {}
         for col in separated_columns:
             separated_values[col] = row[col]
-        
+
         for col in columns:
             value = int(row[col])
 
@@ -346,16 +346,16 @@ def _load_and_group_insee_data(file_path: str, sheet_name: str, variables_mappin
             split_parts = col_simplified.split('_')
             if len(split_parts) != len(variables):
                 raise ValueError(f"Le nom de la colonne '{col}' ne correspond pas au format attendu.")
-    
+
             row_to_add = {
                 **separated_values
             }
-            
+
             for i, var in enumerate(variables):
                 code = split_parts[i]
                 label = variables_mapping[var].get(code, None)
                 row_to_add[var] = label
-            
+
             row_to_add["Nombre"] = value
 
             flattened_data.append(row_to_add)
@@ -400,7 +400,6 @@ def load_and_clean_insee_2007_famille(sheet: str = "COM") -> pd.DataFrame:
     )
 
     return df
-
 
 def load_and_clean_insee_2007_menage(sheet: str = "COM") -> pd.DataFrame:
     """
@@ -847,3 +846,8 @@ def load_and_clean_insee_2007_emploi(sheet: str = "COM") -> pd.DataFrame:
 
 
 
+
+
+def load_and_clean_processed_analysis_municipal():
+    df = pd.read_csv(PROCESSED_DATA_FILES['analysis_municipal'], sep=';', encoding='utf-8', low_memory=False)
+    return df

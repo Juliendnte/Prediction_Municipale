@@ -56,4 +56,5 @@ RAW_DATA_FILES = {
 
 PROCESSED_DATA_FILES = {
     "res_all": PROCESSED_DATA_DIR / "Resultat_Municipale_Anuelle.csv",
+    "analysis_municipal": PROCESSED_DATA_DIR / "Analysis_Municipale.csv",
 }
