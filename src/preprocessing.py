@@ -318,7 +318,9 @@ def _load_and_group_insee_data(file_path: str, sheet_name: str, variables_mappin
     # Round and convert to numeric, replacing non-numeric values with NaN
     df = df.round(0).apply(pd.to_numeric, errors='coerce')
     # Convert to int, ignoring errors for non-numeric columns
+    # Convert to int, ignoring errors for non-numeric columns
     for col in df.columns:
+        df[col] = df[col].astype('int', errors='ignore')
         df[col] = df[col].astype('int', errors='ignore')
 
     columns = list(df.columns)
@@ -336,6 +338,7 @@ def _load_and_group_insee_data(file_path: str, sheet_name: str, variables_mappin
         for col in separated_columns:
             separated_values[col] = row[col]
 
+
         for col in columns:
             value = int(row[col])
 
@@ -347,14 +350,17 @@ def _load_and_group_insee_data(file_path: str, sheet_name: str, variables_mappin
             if len(split_parts) != len(variables):
                 raise ValueError(f"Le nom de la colonne '{col}' ne correspond pas au format attendu.")
 
+
             row_to_add = {
                 **separated_values
             }
+
 
             for i, var in enumerate(variables):
                 code = split_parts[i]
                 label = variables_mapping[var].get(code, None)
                 row_to_add[var] = label
+
 
             row_to_add["Nombre"] = value
 
@@ -851,3 +857,278 @@ def load_and_clean_insee_2007_emploi(sheet: str = "COM") -> pd.DataFrame:
 def load_and_clean_processed_analysis_municipal():
     df = pd.read_csv(PROCESSED_DATA_FILES['analysis_municipal'], sep=';', encoding='utf-8', low_memory=False)
     return df
+
+# ============================================================================
+# == INSEE 2013 & 2019 — moteur de chargement auto-descriptif ================
+# ============================================================================
+# Pourquoi un nouveau moteur plutôt que réutiliser les fonctions 2007 ?
+# Les fichiers 2013/2019 ont la MÊME logique que 2007 mais :
+#   - les numéros de ligne (header_row/nrows) codés en dur ne tombent plus juste ;
+#   - le nom d'une variable change selon l'année (DIPL -> DIPL_15 -> DIPL_19,
+#     AGE4 -> AGE_4, CS3_31 -> CS3_29) ;
+#   - l'INSEE écrit parfois le même code avec ou sans préfixe ('00' vs 'AGE400'),
+#     et nomme la variable différemment entre l'en-tête de données et la feuille
+#     'Liste des variables' (AGE_4 vs AGE4).
+# Ces fichiers étant AUTO-DESCRIPTIFS (un bloc 'Variables :' liste les variables
+# croisées juste au-dessus de la ligne CODGEO), on lit la structure directement
+# dans le fichier au lieu de la coder en dur. Compatible .xls (xlrd) et .xlsx.
+
+def _insee_norm(s: str) -> str:
+    # retire espaces/underscores, garde les points : 'C.O.M.' != 'COM'
+    return re.sub(r"[\s_]", "", str(s).lower())
+
+
+def _insee_find_sheet(path, *candidates) -> str:
+    xls = pd.ExcelFile(path)
+    raw = {str(s).strip().lower(): s for s in xls.sheet_names}
+    available = {_insee_norm(s): s for s in xls.sheet_names}
+    for c in candidates:                       # 1) brute exacte (casse ignorée)
+        if str(c).strip().lower() in raw:
+            return raw[str(c).strip().lower()]
+    for c in candidates:                       # 2) normalisée exacte
+        if _insee_norm(c) in available:
+            return available[_insee_norm(c)]
+    for c in candidates:                       # 3) inclusion (points bloquants)
+        nc = _insee_norm(c)
+        for k, real in available.items():
+            if nc and (nc in k or k in nc):
+                return real
+    raise ValueError(
+        f"Aucune feuille parmi {candidates} dans {path}. "
+        f"Feuilles disponibles : {xls.sheet_names}"
+    )
+
+
+def _insee_detect_structure(path, sheet, max_scan: int = 25):
+    """Renvoie (feuille, header_row, [variables], [lignes_variables], top_df)."""
+    real_sheet = _insee_find_sheet(path, sheet)
+    top = pd.read_excel(
+        path, sheet_name=real_sheet, header=None, nrows=max_scan, dtype=str
+    ).fillna("")
+
+    header_row = None
+    for i in range(len(top)):
+        if str(top.iat[i, 0]).strip().upper() == "CODGEO":
+            header_row = i
+            break
+    if header_row is None:
+        raise ValueError(f"'CODGEO' introuvable dans '{real_sheet}' ({path}).")
+
+    var_start = None
+    for i in range(header_row):
+        if str(top.iat[i, 0]).strip().lower().startswith("variables"):
+            var_start = i
+            break
+    if var_start is None:
+        raise ValueError(f"Bloc 'Variables :' introuvable dans '{real_sheet}' ({path}).")
+
+    col_var = 1 if top.shape[1] > 1 else 0
+    variables, var_rows = [], []
+    for i in range(var_start, header_row):
+        name = str(top.iat[i, col_var]).strip()
+        if name:
+            variables.append(name)
+            var_rows.append(i)
+        elif variables:
+            break
+    if not variables:
+        raise ValueError(f"Aucune variable lue dans '{real_sheet}' ({path}).")
+    return real_sheet, header_row, variables, var_rows, top
+
+
+def _insee_extract_modalities(path, variables, variables_sheet=None):
+    """Renvoie {VARIABLE: {code: libellé}} (appariement tolérant aux underscores)."""
+    if variables_sheet is None:
+        variables_sheet = _insee_find_sheet(
+            path, "Liste des variables", "liste_variables", "Liste_variables",
+            "Liste variables", "Variables",
+        )
+    raw = pd.read_excel(path, sheet_name=variables_sheet, header=None, dtype=str)
+    lines = (
+        raw.fillna("").astype(str).agg(" ".join, axis=1)
+        .str.replace(r"\s+", " ", regex=True).str.strip().tolist()
+    )
+
+    def _vnorm(s):
+        return re.sub(r"[^A-Z0-9]", "", str(s).upper())
+
+    norm_to_var = {_vnorm(v): v for v in variables}
+    metadata = {v: {} for v in variables}
+    current = None
+    for line in lines:
+        if not line or ":" not in line:
+            continue
+        left, right = line.split(":", 1)
+        code, label = left.strip(), right.strip()
+        if not code or not label:
+            continue
+        if _vnorm(code) in norm_to_var:
+            current = norm_to_var[_vnorm(code)]
+        elif current is not None:
+            metadata[current][code] = label
+
+    missing = [v for v in variables if not metadata[v]]
+    if missing:
+        raise ValueError(
+            f"Aucune modalité trouvée pour {missing} dans '{variables_sheet}' ({path})."
+        )
+    return metadata
+
+
+def _insee_resolve_code(cell, codes_by_len):
+    """Retrouve le code (cellule = code, ou se termine par le code connu le plus long)."""
+    cell = str(cell).strip()
+    for c in codes_by_len:
+        if cell == c or cell.endswith(c):
+            return c
+    return None
+
+
+_INSEE_ID_COLS = ["CODGEO", "LIBGEO"]
+
+
+def load_insee_file(path, sheet: str = "COM", as_int: bool = True,
+                    rename: dict | None = None) -> pd.DataFrame:
+    """Charge une table INSEE BTX_TD (2007/2013/2019) en format long.
+
+    Colonnes de sortie : CODGEO, LIBGEO, <une colonne par variable>, Nombre.
+
+    Args:
+        path: chemin .xls / .xlsx.
+        sheet: feuille de données ('COM' par défaut, tolérante à la casse).
+        as_int: arrondit les effectifs à l'entier (comme les loaders 2007).
+        rename: renommage des colonnes de variables, ex. {'DIPL_15': 'DIPL'}.
+    """
+    real_sheet, header_row, variables, var_rows, top = _insee_detect_structure(path, sheet)
+    mapping = _insee_extract_modalities(path, variables)
+    codes_by_len = {v: sorted(mapping[v].keys(), key=len, reverse=True) for v in variables}
+
+    df = pd.read_excel(path, sheet_name=real_sheet, header=header_row, dtype=str)
+    df.columns = df.columns.astype(str).str.strip()
+    sep_cols = [c for c in _INSEE_ID_COLS if c in df.columns]
+
+    frames = []
+    for m, col in enumerate(df.columns):
+        if col in sep_cols:
+            continue
+        if m >= top.shape[1]:
+            raise ValueError(f"Désalignement bloc/données sur la colonne '{col}'.")
+        labels = {}
+        for var, vr in zip(variables, var_rows):
+            code = _insee_resolve_code(top.iat[vr, m], codes_by_len[var])
+            labels[var] = mapping[var].get(code)
+        sub = pd.DataFrame({c: df[c] for c in sep_cols})
+        for var in variables:
+            sub[var] = labels[var]
+        sub["Nombre"] = pd.to_numeric(df[col], errors="coerce")
+        frames.append(sub)
+
+    out = pd.concat(frames, ignore_index=True).dropna(subset=["Nombre"])
+    if as_int:
+        out["Nombre"] = out["Nombre"].round().astype(int)
+    if rename:
+        out = out.rename(columns=rename)
+    return out.reset_index(drop=True)
+
+
+# --- Renommages canoniques (différences de nom seules, même concept) ---------
+# DIPL_15/DIPL_19 -> DIPL et AGE_4 -> AGE4, pour rester empilable avec 2007.
+# NB : CS3_29 (2013/2019) n'est PAS renommé en CS3_31 (2007) car la nomenclature
+# CSP a changé (29 vs 31 postes) ; de même les modalités du diplôme diffèrent
+# d'une année à l'autre — seul le nom de colonne est harmonisé.
+_RENAME_2013 = {"DIPL_15": "DIPL", "AGE_4": "AGE4"}
+_RENAME_2019 = {"DIPL_19": "DIPL", "AGE_4": "AGE4"}
+
+
+# ---------------------------------------------------------------------------
+# Wrappers 2013 (mêmes signatures que les fonctions 2007)
+# ---------------------------------------------------------------------------
+def load_and_clean_insee_2013_famille(sheet: str = "COM") -> pd.DataFrame:
+    """BTX_TD_FAM4_2013.xls — variables CS2_24, NBENFFR."""
+    return load_insee_file(RAW_DATA_FILES['INSEE_2013_Fam'], sheet, rename=_RENAME_2013)
+
+def load_and_clean_insee_2013_menage(sheet: str = "COM") -> pd.DataFrame:
+    """BTX_TD_MEN1_2013.xls — variables CS2_24, NPERC."""
+    return load_insee_file(RAW_DATA_FILES['INSEE_2013_Men'], sheet, rename=_RENAME_2013)
+
+def load_and_clean_insee_2013_diplome(sheet: str = "COM") -> pd.DataFrame:
+    """BTX_TD_FOR2_2013.xls — SEXE, AGEQ65, DIPL (=DIPL_15)."""
+    return load_insee_file(RAW_DATA_FILES['INSEE_2013_Dip'], sheet, rename=_RENAME_2013)
+
+def load_and_clean_insee_2013_population(sheet: str = "COM") -> pd.DataFrame:
+    """BTX_TD_POP5_2013.xls — SEXE, AGEQ65, TACTR."""
+    return load_insee_file(RAW_DATA_FILES['INSEE_2013_Pop'], sheet, rename=_RENAME_2013)
+
+def load_and_clean_insee_2013_population2(sheet: str = "COM") -> pd.DataFrame:
+    """BTX_TD_POP6_2013.xls — SEXE, AGEQ65, CS1_8."""
+    return load_insee_file(RAW_DATA_FILES['INSEE_2013_Pop2'], sheet, rename=_RENAME_2013)
+
+def load_and_clean_insee_2013_nationalite(sheet: str = "COM") -> pd.DataFrame:
+    """BTX_TD_NAT1_2013.xls — SEXE, INATC, AGE4 (=AGE_4)."""
+    return load_insee_file(RAW_DATA_FILES['INSEE_2013_Nat'], sheet, rename=_RENAME_2013)
+
+def load_and_clean_insee_2013_nationalite2(sheet: str = "COM") -> pd.DataFrame:
+    """BTX_TD_NAT3A_2013.xls — SEXE, INATC, CS1_8."""
+    return load_insee_file(RAW_DATA_FILES['INSEE_2013_Nat2'], sheet, rename=_RENAME_2013)
+
+def load_and_clean_insee_2013_logement(sheet: str = "COM") -> pd.DataFrame:
+    """BTX_TD_PRINC14_2013.xls — TYPLR, CS1_8, STOCD."""
+    return load_insee_file(RAW_DATA_FILES['INSEE_2013_Log'], sheet, rename=_RENAME_2013)
+
+def load_and_clean_insee_2013_emploi(sheet: str = "COM") -> pd.DataFrame:
+    """BTX_TD_EMP3_2013.xls — SEXE, CS3_29, NA5 (nomenclature CSP 29 postes)."""
+    return load_insee_file(RAW_DATA_FILES['INSEE_2013_Emp'], sheet, rename=_RENAME_2013)
+
+def load_and_clean_insee_2013_immigration(sheet: str = "COM") -> pd.DataFrame:
+    """BTX_TD_IMG2A_2013.xls — SEXE, AGE4_A, IMMI, TACTR (feuille COM disponible)."""
+    return load_insee_file(RAW_DATA_FILES['INSEE_2013_Img'], sheet, rename=_RENAME_2013)
+
+
+# ---------------------------------------------------------------------------
+# Wrappers 2019 (fichiers .xlsx)
+# ---------------------------------------------------------------------------
+def load_and_clean_insee_2019_famille(sheet: str = "COM") -> pd.DataFrame:
+    """BTX_TD_FAM4_2019.xlsx — variables CS2_24, NBENFFR."""
+    return load_insee_file(RAW_DATA_FILES['INSEE_2019_Fam'], sheet, rename=_RENAME_2019)
+
+def load_and_clean_insee_2019_menage(sheet: str = "COM") -> pd.DataFrame:
+    """BTX_TD_MEN1_2019.xlsx — variables CS2_24, NPERC."""
+    return load_insee_file(RAW_DATA_FILES['INSEE_2019_Men'], sheet, rename=_RENAME_2019)
+
+def load_and_clean_insee_2019_diplome(sheet: str = "COM") -> pd.DataFrame:
+    """BTX_TD_FOR2_2019.xlsx — SEXE, AGEQ65, DIPL (=DIPL_19)."""
+    return load_insee_file(RAW_DATA_FILES['INSEE_2019_Dip'], sheet, rename=_RENAME_2019)
+
+def load_and_clean_insee_2019_population(sheet: str = "COM") -> pd.DataFrame:
+    """BTX_TD_POP5_2019.xlsx — SEXE, AGEQ65, TACTR."""
+    return load_insee_file(RAW_DATA_FILES['INSEE_2019_Pop'], sheet, rename=_RENAME_2019)
+
+def load_and_clean_insee_2019_population2(sheet: str = "COM") -> pd.DataFrame:
+    """BTX_TD_POP6_2019.xlsx — SEXE, AGEQ65, CS1_8."""
+    return load_insee_file(RAW_DATA_FILES['INSEE_2019_Pop2'], sheet, rename=_RENAME_2019)
+
+def load_and_clean_insee_2019_nationalite(sheet: str = "COM") -> pd.DataFrame:
+    """BTX_TD_NAT1_2019.xlsx — SEXE, INATC, AGE4 (=AGE_4)."""
+    return load_insee_file(RAW_DATA_FILES['INSEE_2019_Nat'], sheet, rename=_RENAME_2019)
+
+def load_and_clean_insee_2019_nationalite2(sheet: str = "COM") -> pd.DataFrame:
+    """BTX_TD_NAT3A_2019.xlsx — SEXE, INATC, CS1_8."""
+    return load_insee_file(RAW_DATA_FILES['INSEE_2019_Nat2'], sheet, rename=_RENAME_2019)
+
+def load_and_clean_insee_2019_logement(sheet: str = "COM") -> pd.DataFrame:
+    """BTX_TD_PRINC14_2019.xlsx — TYPLR, CS1_8, STOCD."""
+    return load_insee_file(RAW_DATA_FILES['INSEE_2019_Log'], sheet, rename=_RENAME_2019)
+
+def load_and_clean_insee_2019_emploi(sheet: str = "COM") -> pd.DataFrame:
+    """BTX_TD_EMP3_2019.xlsx — SEXE, CS3_29, NA5 (nomenclature CSP 29 postes)."""
+    return load_insee_file(RAW_DATA_FILES['INSEE_2019_Emp'], sheet, rename=_RENAME_2019)
+
+def load_and_clean_insee_2019_immigration(sheet: str = "COM") -> pd.DataFrame:
+    """BTX_TD_COM_IMG2A_2019.xlsx.
+
+    ATTENTION : ce fichier ne contient PAS de feuille 'COM' (communes) ; sa seule
+    feuille de données est 'C.O.M.' (Collectivités d'Outre-Mer). Au niveau communal
+    il n'y a donc pas de données ici. Passe sheet='C.O.M.' pour lire l'outre-mer,
+    ou récupère le fichier communal détaillé correspondant auprès de l'INSEE.
+    """
+    return load_insee_file(RAW_DATA_FILES['INSEE_2019_Img'], sheet, rename=_RENAME_2019)
